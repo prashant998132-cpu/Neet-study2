@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NEET AI WAR Mentor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+    margin:0;
+    font-family:Arial, sans-serif;
+    background:radial-gradient(circle at center,#111 0%,#000 80%);
+    color:white;
+    overflow:hidden;
+}
+
+/* CLOCK */
+#clock{
+    position:fixed;
+    top:20px;
+    right:30px;
+    font-size:20px;
+    letter-spacing:2px;
+    opacity:.8;
+}
+
+/* GLASS PANEL */
+#panel{
+    position:fixed;
+    bottom:20px;
+    left:20px;
+    background:rgba(255,255,255,0.05);
+    backdrop-filter:blur(12px);
+    padding:20px;
+    border-radius:16px;
+    width:260px;
+}
+
+/* SLOT */
+.slot{
+    margin-bottom:10px;
+    padding:10px;
+    border-radius:10px;
+    background:rgba(255,255,255,0.05);
+    transition:.3s;
+}
+.running{border:1px solid #00ffcc;}
+.completed{background:rgba(0,255,100,0.15);}
+.missed{background:rgba(255,0,0,0.15);}
+
+/* BUTTONS */
+button{
+    padding:6px 10px;
+    margin-top:5px;
+    margin-right:5px;
+    background:#222;
+    color:white;
+    border:none;
+    cursor:pointer;
+    border-radius:6px;
+    transition:.3s;
+}
+button:hover{background:#444}
+
+/* ASSISTANT */
+#assistant{
+    position:fixed;
+    bottom:0;
+    left:50%;
+    transform:translateX(-50%);
+    transition:all .8s cubic-bezier(.4,0,.2,1);
+}
+
+#assistant img{
+    height:85vh;
+    animation:float 6s ease-in-out infinite,
+               breathe 4s ease-in-out infinite;
+    transition:.3s;
+}
+
+/* FLOAT */
+@keyframes float{
+0%{transform:translateY(0px)}
+50%{transform:translateY(-8px)}
+100%{transform:translateY(0px)}
+}
+
+/* BREATH */
+@keyframes breathe{
+0%{scale:1}
+50%{scale:1.02}
+100%{scale:1}
+}
+
+/* BLINK */
+.blink img{
+    filter:brightness(0.85);
+}
+
+/* HAIR SWAY */
+@keyframes hair{
+0%{rotate:0deg}
+50%{rotate:.4deg}
+100%{rotate:0deg}
+}
+#assistant img{animation:float 6s ease-in-out infinite,
+breathe 4s ease-in-out infinite,
+hair 8s ease-in-out infinite}
+
+/* SPEAK */
+.speaking img{
+    animation:talk .35s infinite alternate;
+}
+@keyframes talk{
+from{transform:translateY(0px) scale(1)}
+to{transform:translateY(-3px) scale(1.03)}
+}
+
+/* SHRINK */
+.shrink{
+    left:auto!important;
+    right:20px;
+    bottom:20px;
+    transform:none!important;
+}
+.shrink img{height:220px}
+
+/* MOOD GLOW */
+.normal img{filter:drop-shadow(0 0 15px #ffffff33)}
+.strict img{filter:drop-shadow(0 0 25px red)}
+.gentle img{filter:drop-shadow(0 0 25px #00aaff)}
+
+/* BLUR */
+.blur{backdrop-filter:blur(6px)}
+
+</style>
+</head>
+<body>
+
+<div id="clock"></div>
+
+<div id="panel"></div>
+
+<div id="assistant" class="normal">
+<img src="girl.png">
+</div>
+
+<script>
+
+/* SCHEDULE */
+const schedule=[
+{start:"05:00",end:"07:00",subject:"Physics"},
+{start:"07:30",end:"09:00",subject:"Chemistry"},
+{start:"14:00",end:"16:00",subject:"Biology"},
+{start:"18:00",end:"20:00",subject:"Revision"}
+];
+
+let currentSlot=null;
+let delayTimer=null;
+
+/* CLOCK */
+function updateClock(){
+const now=new Date();
+document.getElementById("clock").innerText=now.toLocaleTimeString();
+checkSchedule(now);
+}
+setInterval(updateClock,1000);
+
+/* TIME CHECK */
+function checkSchedule(now){
+const time=now.toTimeString().slice(0,5);
+schedule.forEach(slot=>{
+if(time===slot.start && currentSlot!==slot.subject){
+startSlot(slot);
+}
+if(time===slot.end && currentSlot===slot.subject){
+endSlot(slot);
+}
+});
+}
+
+/* START SLOT */
+function startSlot(slot){
+currentSlot=slot.subject;
+speak("Session started: "+slot.subject,"normal");
+delayTimer=setTimeout(()=>{
+speak("You are delaying. Start immediately.","strict");
+},300000);
+}
+
+/* END SLOT */
+function endSlot(slot){
+if(localStorage.getItem(slot.subject)!=="completed"){
+markMissed(slot.subject);
+speak("Time over. Target incomplete.","strict");
+}
+currentSlot=null;
+}
+
+/* SPEAK */
+function speak(text,mood){
+const assistant=document.getElementById("assistant");
+assistant.classList.remove("normal","strict","gentle");
+assistant.classList.add(mood);
+assistant.classList.remove("shrink");
+assistant.classList.add("speaking");
+document.body.classList.add("blur");
+
+let msg=new SpeechSynthesisUtterance(text);
+if(mood==="strict"){msg.pitch=.9;msg.rate=.9}
+if(mood==="gentle"){msg.pitch=1.2;msg.rate=.95}
+
+msg.onend=()=>{
+assistant.classList.remove("speaking");
+assistant.classList.add("shrink");
+document.body.classList.remove("blur");
+};
+speechSynthesis.speak(msg);
+}
+
+/* PANEL BUILD */
+function renderPanel(){
+const panel=document.getElementById("panel");
+panel.innerHTML="";
+schedule.forEach(slot=>{
+let state=localStorage.getItem(slot.subject)||"pending";
+let div=document.createElement("div");
+div.className="slot "+state;
+div.innerHTML=`<b>${slot.subject}</b><br>
+${slot.start} - ${slot.end}<br>
+<button onclick="completeSlot('${slot.subject}')">Complete</button>`;
+panel.appendChild(div);
+});
+}
+renderPanel();
+
+/* COMPLETE */
+function completeSlot(sub){
+if(localStorage.getItem(sub)==="completed"){
+localStorage.removeItem(sub);
+}else{
+localStorage.setItem(sub,"completed");
+clearTimeout(delayTimer);
+speak(randomMotivation(),"gentle");
+}
+renderPanel();
+}
+
+/* MISS */
+function markMissed(sub){
+localStorage.setItem(sub,"missed");
+renderPanel();
+}
+
+/* MOTIVATION */
+function randomMotivation(){
+const lines=[
+"Good work. Maintain this pace.",
+"Consistency brings rank.",
+"Keep pushing forward.",
+"That is serious discipline."
+];
+return lines[Math.floor(Math.random()*lines.length)];
+}
+
+/* DAILY RESET */
+function dailyReset(){
+const today=new Date().toDateString();
+if(localStorage.getItem("date")!==today){
+localStorage.clear();
+localStorage.setItem("date",today);
+renderPanel();
+}
+}
+dailyReset();
+
+/* BLINK */
+setInterval(()=>{
+document.getElementById("assistant").classList.add("blink");
+setTimeout(()=>document.getElementById("assistant").classList.remove("blink"),150);
+},4000+Math.random()*3000);
+
+/* INITIAL SHRINK */
+setTimeout(()=>document.getElementById("assistant").classList.add("shrink"),1500);
+
+</script>
+</body>
+</html>
